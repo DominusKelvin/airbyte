@@ -34,9 +34,10 @@ import io.airbyte.db.jdbc.JdbcDatabase;
 import io.airbyte.integrations.base.Destination;
 import io.airbyte.integrations.base.DestinationConsumer;
 import io.airbyte.integrations.base.IntegrationRunner;
-import io.airbyte.integrations.destination.DestinationConsumerFactory;
 import io.airbyte.integrations.destination.NamingConventionTransformer;
-import io.airbyte.integrations.destination.SqlDestinationOperations;
+import io.airbyte.integrations.destination.jdbc.DefaultDestinationSqlOperations;
+import io.airbyte.integrations.destination.jdbc.DestinationConsumerFactory;
+import io.airbyte.integrations.destination.jdbc.DestinationSqlOperations;
 import io.airbyte.protocol.models.AirbyteConnectionStatus;
 import io.airbyte.protocol.models.AirbyteConnectionStatus.Status;
 import io.airbyte.protocol.models.AirbyteMessage;
@@ -89,26 +90,8 @@ public class SnowflakeDestination implements Destination {
 
   @Override
   public DestinationConsumer<AirbyteMessage> write(JsonNode config, ConfiguredAirbyteCatalog catalog) throws Exception {
-    final DestinationImpl destination = new DestinationImpl(SnowflakeDatabase.getDatabase(config));
+    final DestinationSqlImpl destination = new DestinationSqlImpl(SnowflakeDatabase.getDatabase(config));
     return DestinationConsumerFactory.build(destination, getNamingTransformer(), config, catalog);
-  }
-
-  protected String createSchemaQuery(String schemaName) {
-    return String.format("CREATE SCHEMA IF NOT EXISTS %s;\n", schemaName);
-  }
-
-  protected String createDestinationTableQuery(String schemaName, String tableName) {
-    return String.format(
-        "CREATE TABLE IF NOT EXISTS %s.%s ( \n"
-            + "ab_id VARCHAR PRIMARY KEY,\n"
-            + "\"%s\" VARIANT,\n"
-            + "emitted_at TIMESTAMP WITH TIME ZONE DEFAULT current_timestamp()\n"
-            + ") data_retention_time_in_days = 0;",
-        schemaName, tableName, COLUMN_NAME);
-  }
-
-  protected String dropDestinationTableQuery(String schemaName, String tableName) {
-    return String.format("DROP TABLE IF EXISTS %s.%s;\n", schemaName, tableName);
   }
 
   public static void main(String[] args) throws Exception {
@@ -118,43 +101,25 @@ public class SnowflakeDestination implements Destination {
     LOGGER.info("completed destination: {}", SnowflakeDestination.class);
   }
 
-  private class DestinationImpl implements SqlDestinationOperations {
+  private static class DestinationSqlImpl extends DefaultDestinationSqlOperations implements DestinationSqlOperations {
 
     private final JdbcDatabase database;
 
-    public DestinationImpl(JdbcDatabase database) {
+    public DestinationSqlImpl(JdbcDatabase database) {
+      super(database);
       this.database = database;
     }
 
     @Override
-    public void createSchema(String schemaName) throws SQLException, InterruptedException {
-      database.execute(createSchemaQuery(schemaName));
-    }
-
-    @Override
-    public void createDestinationTable(String schemaName, String tableName) throws SQLException, InterruptedException {
-      database.execute(createDestinationTableQuery(schemaName, tableName));
-    }
-
-    @Override
-    public String truncateTableQuery(String schemaName, String tableName) {
-      return String.format("TRUNCATE TABLE %s.%s;\n", schemaName, tableName);
-    }
-
-    @Override
-    public String insertIntoFromSelectQuery(String schemaName, String srcTableName, String dstTableName) {
-      return String.format("INSERT INTO %s.%s SELECT * FROM %s.%s;\n", schemaName, dstTableName, schemaName, srcTableName);
-    }
-
-    @Override
-    public void executeTransaction(String queries) throws Exception {
-      String renameQuery = "BEGIN;\n" + queries + "COMMIT;";
-      database.execute(renameQuery);
-    }
-
-    @Override
-    public void dropDestinationTable(String schemaName, String tableName) throws SQLException, InterruptedException {
-      database.execute(dropDestinationTableQuery(schemaName, tableName));
+    public void createDestinationTable(String schemaName, String tableName) throws SQLException {
+      final String createTableQuery = String.format(
+          "CREATE TABLE IF NOT EXISTS %s.%s ( \n"
+              + "ab_id VARCHAR PRIMARY KEY,\n"
+              + "\"%s\" VARIANT,\n"
+              + "emitted_at TIMESTAMP WITH TIME ZONE DEFAULT current_timestamp()\n"
+              + ") data_retention_time_in_days = 0;",
+          schemaName, tableName, COLUMN_NAME);
+      database.execute(createTableQuery);
     }
 
     @Override
@@ -176,11 +141,11 @@ public class SnowflakeDestination implements Destination {
         // string. Thus there will be two loops below.
         // 1) Loop over records to build the full string.
         // 2) Loop over the records and bind the appropriate values to the string.
-        final StringBuilder sql = new StringBuilder().append(String.format(
+        final StringBuilder sql = new StringBuilder(String.format(
             "INSERT INTO %s.%s (ab_id, \"%s\", emitted_at) SELECT column1, parse_json(column2), column3 FROM VALUES\n",
             schemaName,
             tmpTableName,
-            SnowflakeDestination.COLUMN_NAME));
+            COLUMN_NAME));
 
         // first loop: build SQL string.
         records.forEach(r -> sql.append("(?, ?, ?),\n"));
@@ -203,6 +168,7 @@ public class SnowflakeDestination implements Destination {
       });
     }
 
+    // todo (cgardens) - dedupe.
     /**
      * Accumulate AirbyteRecordMessages from each buffer into batches of records so we can avoid
      * wasteful inserts queries.

@@ -22,19 +22,46 @@
  * SOFTWARE.
  */
 
-package io.airbyte.integrations.destination;
+package io.airbyte.integrations.destination.jdbc;
 
-import java.util.Map;
+import io.airbyte.protocol.models.SyncMode;
 
 /**
- * Interface to move data from one temporary location to a final target destination
- *
- * Parameters per String are first set by the setContext methods before executing the actual move
+ * This configuration is used by the RecordConsumers to adapt their behavior at runtime such as
+ * where to apply their task and the kind of data operations
  */
-public interface TmpToFinalTable {
+public class DestinationWriteContext {
 
-  void setContext(Map<String, DestinationCopyContext> configs);
+  private final String outputNamespaceName;
+  private final String outputTableName;
+  private final SyncMode syncMode;
+  private boolean transactionMode;
 
-  void execute() throws Exception;
+  DestinationWriteContext(String outputNamespaceName, String outputTableName, SyncMode syncMode) {
+    this.outputNamespaceName = outputNamespaceName;
+    this.outputTableName = outputTableName;
+    this.syncMode = syncMode;
+    this.transactionMode = true;
+  }
+
+  public String getOutputNamespaceName() {
+    return outputNamespaceName;
+  }
+
+  public String getOutputTableName() {
+    return outputTableName;
+  }
+
+  public SyncMode getSyncMode() {
+    return syncMode;
+  }
+
+  public boolean getTransactionMode() {
+    return transactionMode;
+  }
+
+  public void setTransactionMode(boolean transactionMode) {
+    this.transactionMode = transactionMode;
+  }
 
 }

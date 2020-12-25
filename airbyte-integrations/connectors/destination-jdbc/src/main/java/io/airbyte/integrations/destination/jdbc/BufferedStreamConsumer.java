@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-package io.airbyte.integrations.destination;
+package io.airbyte.integrations.destination.jdbc;
 
 import com.google.common.base.Charsets;
 import io.airbyte.commons.concurrency.GracefulShutdownHandler;
@@ -53,13 +53,13 @@ public class BufferedStreamConsumer extends FailureTrackingConsumer<AirbyteMessa
   private static final int MIN_RECORDS = 500;
   private static final int BATCH_SIZE = 500;
 
-  private final BufferedWriteOperations destination;
+  private final DestinationSqlOperations destination;
   private Map<String, DestinationWriteContext> writeConfigs;
   private Map<String, CloseableQueue<byte[]>> writeBuffers;
   private final ScheduledExecutorService writerPool;
   private final ConfiguredAirbyteCatalog catalog;
 
-  public BufferedStreamConsumer(BufferedWriteOperations destination, ConfiguredAirbyteCatalog catalog) {
+  public BufferedStreamConsumer(DestinationSqlOperations destination, ConfiguredAirbyteCatalog catalog) {
     this.destination = destination;
     this.writeConfigs = new HashMap<>();
     this.writeBuffers = new HashMap<>();
@@ -87,7 +87,7 @@ public class BufferedStreamConsumer extends FailureTrackingConsumer<AirbyteMessa
   private static void writeStreamsWithNRecords(int minRecords,
                                                Map<String, DestinationWriteContext> writeConfigs,
                                                Map<String, CloseableQueue<byte[]>> writeBuffers,
-                                               BufferedWriteOperations destination) {
+                                               DestinationSqlOperations destination) {
     for (final Map.Entry<String, DestinationWriteContext> entry : writeConfigs.entrySet()) {
       final String schemaName = entry.getValue().getOutputNamespaceName();
       final String tmpTableName = entry.getValue().getOutputTableName();

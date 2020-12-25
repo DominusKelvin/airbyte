@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-package io.airbyte.integrations.destination;
+package io.airbyte.integrations.destination.jdbc;
 
 import io.airbyte.commons.text.Names;
 import io.airbyte.integrations.base.FailureTrackingConsumer;
@@ -51,12 +51,12 @@ public class TmpDestinationConsumer extends FailureTrackingConsumer<AirbyteMessa
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TmpDestinationConsumer.class);
 
-  private final TableCreationOperations destination;
+  private final DestinationSqlOperations destination;
   private final DestinationConsumerStrategy tmpDestinationConsumer;
   private final TmpToFinalTable finalDestinationConsumer;
   private Map<String, DestinationWriteContext> tmpConfigs;
 
-  public TmpDestinationConsumer(TableCreationOperations destination,
+  public TmpDestinationConsumer(DestinationSqlOperations destination,
                                 DestinationConsumerStrategy tmpDestinationConsumer,
                                 TmpToFinalTable finalDestinationConsumer) {
     this.destination = destination;

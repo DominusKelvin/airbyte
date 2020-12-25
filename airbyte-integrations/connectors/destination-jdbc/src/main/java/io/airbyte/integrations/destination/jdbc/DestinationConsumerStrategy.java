@@ -22,12 +22,18 @@
  * SOFTWARE.
  */
 
-package io.airbyte.integrations.destination;
+package io.airbyte.integrations.destination.jdbc;
 
-import io.airbyte.commons.lang.CloseableQueue;
+import io.airbyte.integrations.base.DestinationConsumer;
+import io.airbyte.protocol.models.AirbyteMessage;
+import java.util.Map;
 
-public interface BufferedWriteOperations {
+/**
+ * DestinationConsumer configured with a DestinationWriteContext configuration object to slightly
+ * change their behavior at runtime.
+ */
+public interface DestinationConsumerStrategy extends DestinationConsumer<AirbyteMessage> {
 
-  void insertBufferedRecords(int batchSize, CloseableQueue<byte[]> writeBuffer, String namespace, String streamName) throws Exception;
+  void setContext(Map<String, DestinationWriteContext> configs) throws Exception;
 
 }

@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-package io.airbyte.integrations.destination;
+package io.airbyte.integrations.destination.jdbc;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -41,10 +41,10 @@ public class TruncateInsertIntoConsumer implements TmpToFinalTable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TruncateInsertIntoConsumer.class);
 
-  private final InsertTableOperations destination;
+  private final DestinationSqlOperations destination;
   private Map<String, DestinationCopyContext> copyConfigs;
 
-  public TruncateInsertIntoConsumer(InsertTableOperations destination) {
+  public TruncateInsertIntoConsumer(DestinationSqlOperations destination) {
     this.destination = destination;
     this.copyConfigs = new HashMap<>();
   }

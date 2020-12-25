@@ -22,46 +22,26 @@
  * SOFTWARE.
  */
 
-package io.airbyte.integrations.destination;
+package io.airbyte.integrations.destination.jdbc;
 
-import io.airbyte.protocol.models.SyncMode;
+import io.airbyte.commons.lang.CloseableQueue;
 
-/**
- * This configuration is used by the RecordConsumers to adapt their behavior at runtime such as
- * where to apply their task and the kind of data operations
- */
-public class DestinationWriteContext {
+public interface DestinationSqlOperations {
 
-  private final String outputNamespaceName;
-  private final String outputTableName;
-  private final SyncMode syncMode;
-  private boolean transactionMode;
+  void createSchema(String schemaName) throws Exception;
 
-  DestinationWriteContext(String outputNamespaceName, String outputTableName, SyncMode syncMode) {
-    this.outputNamespaceName = outputNamespaceName;
-    this.outputTableName = outputTableName;
-    this.syncMode = syncMode;
-    this.transactionMode = true;
-  }
+  void createDestinationTable(String schemaName, String tmpTableName) throws Exception;
 
-  public String getOutputNamespaceName() {
-    return outputNamespaceName;
-  }
+  String createDestinationTableQuery(String schemaName, String tableName);
 
-  public String getOutputTableName() {
-    return outputTableName;
-  }
+  void dropDestinationTable(String schemaName, String tmpTableName) throws Exception;
 
-  public SyncMode getSyncMode() {
-    return syncMode;
-  }
+  void insertBufferedRecords(int batchSize, CloseableQueue<byte[]> writeBuffer, String namespace, String streamName) throws Exception;
 
-  public boolean getTransactionMode() {
-    return transactionMode;
-  }
+  String truncateTableQuery(String schemaName, String tableName);
 
-  public void setTransactionMode(boolean transactionMode) {
-    this.transactionMode = transactionMode;
-  }
+  String insertIntoFromSelectQuery(String schemaName, String srcTableName, String dstTableName);
+
+  void executeTransaction(String queries) throws Exception;
 
 }
