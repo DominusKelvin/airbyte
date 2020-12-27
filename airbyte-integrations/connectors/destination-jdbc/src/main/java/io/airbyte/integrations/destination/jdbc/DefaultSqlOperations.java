@@ -108,10 +108,10 @@ public class DefaultSqlOperations implements SqlOperations {
 
   @Override
   public void dropTableIfExists(String schemaName, String tableName) throws SQLException {
-    database.execute(dropDestinationTableQuery(schemaName, tableName));
+    database.execute(dropTableIfExistsQuery(schemaName, tableName));
   }
 
-  private String dropDestinationTableQuery(String schemaName, String tableName) {
+  private String dropTableIfExistsQuery(String schemaName, String tableName) {
     return String.format("DROP TABLE IF EXISTS %s.%s;\n", schemaName, tableName);
   }
 

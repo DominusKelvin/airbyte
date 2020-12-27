@@ -40,6 +40,7 @@ import io.airbyte.commons.resources.MoreResources;
 import io.airbyte.db.Database;
 import io.airbyte.db.Databases;
 import io.airbyte.integrations.base.DestinationConsumer;
+import io.airbyte.integrations.base.JavaBaseConstants;
 import io.airbyte.protocol.models.AirbyteConnectionStatus;
 import io.airbyte.protocol.models.AirbyteConnectionStatus.Status;
 import io.airbyte.protocol.models.AirbyteMessage;
@@ -299,23 +300,20 @@ class JdbcDestinationTest {
   }
 
   private Set<JsonNode> recordRetriever(String streamName) throws Exception {
-    return database.query(ctx -> {
-      System.out.println("hi");
-      return ctx
-          .fetch(String.format("SELECT * FROM %s ORDER BY emitted_at ASC;", streamName))
-          .stream()
-          .peek(record -> {
-            // ensure emitted_at is not in the future
-            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-            OffsetDateTime emitted_at = record.get("emitted_at", OffsetDateTime.class);
+    return database.query(ctx -> ctx
+        .fetch(String.format("SELECT * FROM %s ORDER BY emitted_at ASC;", streamName))
+        .stream()
+        .peek(record -> {
+          // ensure emitted_at is not in the future
+          OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+          OffsetDateTime emitted_at = record.get("emitted_at", OffsetDateTime.class);
 
-            assertTrue(now.toEpochSecond() >= emitted_at.toEpochSecond());
-          })
-          .map(r -> r.formatJSON(JSON_FORMAT))
-          .map(Jsons::deserialize)
-          .map(r -> Jsons.deserialize(r.get(JdbcDestination.COLUMN_NAME).asText()))
-          .collect(Collectors.toSet());
-    });
+          assertTrue(now.toEpochSecond() >= emitted_at.toEpochSecond());
+        })
+        .map(r -> r.formatJSON(JSON_FORMAT))
+        .map(Jsons::deserialize)
+        .map(r -> Jsons.deserialize(r.get(JavaBaseConstants.COLUMN_NAME_DATA).asText()))
+        .collect(Collectors.toSet()));
   }
 
   private JsonNode createConfig(String schemaName) {

@@ -37,43 +37,15 @@ public class Queues {
 
       @Override
       public boolean tryAdvance(Consumer<? super T> action) {
-        // try {
         final T record = queue.poll();
         if (record == null) {
           return false;
         }
         action.accept(record);
         return true;
-        // } catch (SQLException e) {
-        // throw new RuntimeException(e);
-        // }
       }
 
     }, false);
   }
 
-  // public static <T> Stream<T> toStream(CloseableQueue<byte[]> queue, Function<byte[], T> mapper) {
-  // return StreamSupport.stream(new Spliterators.AbstractSpliterator<>(Long.MAX_VALUE,
-  // Spliterator.ORDERED) {
-  //
-  // @Override
-  // public boolean tryAdvance(Consumer<? super T> action) {
-  //// try {
-  // final byte[] record = queue.poll();
-  // if (record == null) {
-  // return false;
-  // }
-  // action.accept(mapper.apply(record));
-  // return true;
-  //// } catch (SQLException e) {
-  //// throw new RuntimeException(e);
-  //// }
-  // }
-  //
-  // }, false);
-  // }
-  //
-  // public static <T> Stream<T> toJsonStream(CloseableQueue<byte[]> queue, Class<T> klass) {
-  // return toStream(queue, bytes -> Jsons.deserialize(new String(bytes, Charsets.UTF_8), klass));
-  // }
 }

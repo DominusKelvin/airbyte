@@ -67,7 +67,7 @@ public interface SqlOperations {
   void dropTableIfExists(String schemaName, String tableName) throws Exception;
 
   /**
-   * Query to remove all records from a table if it exists.
+   * Query to remove all records from a table. Assumes the table exists.
    *
    * @param schemaName name of schema
    * @param tableName name of table

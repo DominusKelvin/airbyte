@@ -58,8 +58,7 @@ public class JdbcBufferedConsumerFactory {
   public static DestinationConsumer<AirbyteMessage> build(SqlOperations sqlOperations,
                                                           NamingConventionTransformer namingResolver,
                                                           JsonNode config,
-                                                          ConfiguredAirbyteCatalog catalog)
-      throws Exception {
+                                                          ConfiguredAirbyteCatalog catalog) {
     final List<WriteConfig> writeConfigs = createWriteConfigs(namingResolver, config, catalog);
 
     return new BufferedStreamConsumer(
@@ -90,9 +89,7 @@ public class JdbcBufferedConsumerFactory {
         final String schemaName = writeConfig.getOutputNamespaceName();
         final String tmpTableName = writeConfig.getTmpTableName();
 
-        // if (!schemaSet.contains(schemaName)) {
         sqlOperations.createSchemaIfNotExists(schemaName);
-        // }
         sqlOperations.createTableIfNotExists(schemaName, tmpTableName);
       }
     };

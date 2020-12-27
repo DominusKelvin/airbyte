@@ -65,15 +65,6 @@ public class SqlOperationsUtils {
       // 1) Loop over records to build the full string.
       // 2) Loop over the records and bind the appropriate values to the string.
       final StringBuilder sql = new StringBuilder(insertQueryComponent);
-      // final StringBuilder sql = new StringBuilder(String.format(
-      // "INSERT INTO %s.%s (ab_id, \"%s\", emitted_at) SELECT column1, parse_json(column2), column3 FROM
-      // VALUES\n",
-      // schemaName,
-      // tableName,
-      // JavaBaseConstants.COLUMN_NAME_DATA));
-
-      // first loop: build SQL string.
-      // records.forEach(r -> sql.append("(?, ?, ?),\n"));
       records.forEach(r -> sql.append(recordQueryComponent));
       final String s = sql.toString();
       final String s1 = s.substring(0, s.length() - 2) + ";";
