@@ -102,7 +102,7 @@ public abstract class AbstractJdbcDestination implements Destination {
   @Override
   public DestinationConsumer<AirbyteMessage> write(JsonNode config, ConfiguredAirbyteCatalog catalog) throws Exception {
     final DestinationSqlOperations sqlOperations = sqlOperationsFactory.apply(getDatabase(config));
-    return SqlDestinationConsumerFactory.build(sqlOperations, namingResolver, config, catalog);
+    return JdbcBufferedConsumerFactory.build(sqlOperations, namingResolver, config, catalog);
   }
 
 }

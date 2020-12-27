@@ -156,6 +156,7 @@ class JdbcDestinationTest {
     final JdbcDestination destination = new JdbcDestination();
     final DestinationConsumer<AirbyteMessage> consumer = destination.write(config, CATALOG);
 
+    consumer.start();
     consumer.accept(MESSAGE_USERS1);
     consumer.accept(MESSAGE_TASKS1);
     consumer.accept(MESSAGE_USERS2);
@@ -186,6 +187,7 @@ class JdbcDestinationTest {
     final JdbcDestination destination = new JdbcDestination();
     final DestinationConsumer<AirbyteMessage> consumer = destination.write(config, catalog);
 
+    consumer.start();
     consumer.accept(MESSAGE_USERS1);
     consumer.accept(MESSAGE_TASKS1);
     consumer.accept(MESSAGE_USERS2);
@@ -199,6 +201,7 @@ class JdbcDestinationTest {
         .withRecord(new AirbyteRecordMessage().withStream(USERS_STREAM_NAME)
             .withData(Jsons.jsonNode(ImmutableMap.builder().put("name", "michael").put("id", "87").build()))
             .withEmittedAt(NOW.toEpochMilli()));
+    consumer2.start();
     consumer2.accept(messageUser3);
     consumer2.close();
 
@@ -226,6 +229,7 @@ class JdbcDestinationTest {
     final JdbcDestination destination = new JdbcDestination();
     final DestinationConsumer<AirbyteMessage> consumer = destination.write(newConfig, CATALOG);
 
+    consumer.start();
     consumer.accept(MESSAGE_USERS1);
     consumer.accept(MESSAGE_TASKS1);
     consumer.accept(MESSAGE_USERS2);
@@ -264,6 +268,7 @@ class JdbcDestinationTest {
     final DestinationConsumer<AirbyteMessage> consumer = spy(destination.write(config, CATALOG));
 
     assertThrows(RuntimeException.class, () -> consumer.accept(spiedMessage));
+    consumer.start();
     consumer.accept(MESSAGE_USERS2);
     consumer.close();
 

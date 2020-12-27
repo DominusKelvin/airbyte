@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-package io.airbyte.integrations.destination.jdbc;
+package io.airbyte.integrations.destination;
 
 import io.airbyte.protocol.models.SyncMode;
 
@@ -30,7 +30,7 @@ import io.airbyte.protocol.models.SyncMode;
  * This configuration is used by the RecordConsumers to adapt their behavior at runtime such as
  * where to apply their task and the kind of data operations
  */
-public class DestinationWriteContext {
+public class WriteConfig {
 
   private final String streamName;
   private final String outputNamespaceName;
@@ -38,7 +38,7 @@ public class DestinationWriteContext {
   private final String outputTableName;
   private final SyncMode syncMode;
 
-  DestinationWriteContext(String streamName, String outputNamespaceName, String tmpTableName, String outputTableName, SyncMode syncMode) {
+  public WriteConfig(String streamName, String outputNamespaceName, String tmpTableName, String outputTableName, SyncMode syncMode) {
     this.streamName = streamName;
     this.outputNamespaceName = outputNamespaceName;
     this.tmpTableName = tmpTableName;

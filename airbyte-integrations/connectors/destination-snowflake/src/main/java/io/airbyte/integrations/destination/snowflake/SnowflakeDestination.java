@@ -34,7 +34,7 @@ import io.airbyte.integrations.base.IntegrationRunner;
 import io.airbyte.integrations.destination.NamingConventionTransformer;
 import io.airbyte.integrations.destination.jdbc.DefaultDestinationSqlOperations;
 import io.airbyte.integrations.destination.jdbc.DestinationSqlOperations;
-import io.airbyte.integrations.destination.jdbc.SqlDestinationConsumerFactory;
+import io.airbyte.integrations.destination.jdbc.JdbcBufferedConsumerFactory;
 import io.airbyte.protocol.models.AirbyteConnectionStatus;
 import io.airbyte.protocol.models.AirbyteConnectionStatus.Status;
 import io.airbyte.protocol.models.AirbyteMessage;
@@ -90,7 +90,7 @@ public class SnowflakeDestination implements Destination {
   @Override
   public DestinationConsumer<AirbyteMessage> write(JsonNode config, ConfiguredAirbyteCatalog catalog) throws Exception {
     final DestinationSqlImpl destination = new DestinationSqlImpl(SnowflakeDatabase.getDatabase(config));
-    return SqlDestinationConsumerFactory.build(destination, getNamingTransformer(), config, catalog);
+    return JdbcBufferedConsumerFactory.build(destination, getNamingTransformer(), config, catalog);
   }
 
   public static void main(String[] args) throws Exception {

@@ -28,6 +28,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import io.airbyte.commons.text.Names;
 import io.airbyte.integrations.destination.NamingConventionTransformer;
+import io.airbyte.integrations.destination.WriteConfig;
 import io.airbyte.protocol.models.ConfiguredAirbyteCatalog;
 import io.airbyte.protocol.models.ConfiguredAirbyteStream;
 import io.airbyte.protocol.models.SyncMode;
@@ -48,18 +49,19 @@ public class DestinationWriteContextFactory {
     this.namingResolver = namingResolver;
   }
 
-  public Map<String, DestinationWriteContext> build(JsonNode config, ConfiguredAirbyteCatalog catalog) {
+  public Map<String, WriteConfig> build(JsonNode config, ConfiguredAirbyteCatalog catalog) {
     Preconditions.checkState(config.has("schema"), "jdbc destinations must specify a schema.");
     final Instant now = Instant.now();
-    final Map<String, DestinationWriteContext> result = new HashMap<>();
+    final Map<String, WriteConfig> result = new HashMap<>();
     for (final ConfiguredAirbyteStream stream : catalog.getStreams()) {
       final String streamName = stream.getStream().getName();
       final String schemaName = namingResolver.getIdentifier(config.get("schema").asText());
       final String tableName = Names.concatQuotedNames(namingResolver.getIdentifier(streamName), "_raw");
       final String tmpTableName = Names.concatQuotedNames(tableName, "_" + now.toEpochMilli());
       final SyncMode syncMode = stream.getSyncMode() != null ? stream.getSyncMode() : SyncMode.FULL_REFRESH;
-      result.put(streamName, new DestinationWriteContext(streamName, schemaName, tmpTableName, tableName, syncMode));
+      result.put(streamName, new WriteConfig(streamName, schemaName, tmpTableName, tableName, syncMode));
     }
     return result;
   }
+
 }
