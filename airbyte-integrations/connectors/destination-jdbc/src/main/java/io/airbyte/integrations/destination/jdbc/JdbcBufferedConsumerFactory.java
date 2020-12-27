@@ -26,17 +26,16 @@ package io.airbyte.integrations.destination.jdbc;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
-import io.airbyte.commons.concurrency.VoidCallable;
-import io.airbyte.commons.functional.CheckedBiConsumer;
-import io.airbyte.commons.functional.CheckedConsumer;
 import io.airbyte.commons.json.Jsons;
 import io.airbyte.commons.text.Names;
 import io.airbyte.integrations.base.DestinationConsumer;
-import io.airbyte.integrations.destination.BufferedStreamConsumer;
 import io.airbyte.integrations.destination.NamingConventionTransformer;
 import io.airbyte.integrations.destination.WriteConfig;
+import io.airbyte.integrations.destination.buffered_stream_consumer.BufferedStreamConsumer;
+import io.airbyte.integrations.destination.buffered_stream_consumer.BufferedStreamConsumer.OnCloseFunction;
+import io.airbyte.integrations.destination.buffered_stream_consumer.BufferedStreamConsumer.OnStartFunction;
+import io.airbyte.integrations.destination.buffered_stream_consumer.BufferedStreamConsumer.RecordWriter;
 import io.airbyte.protocol.models.AirbyteMessage;
-import io.airbyte.protocol.models.AirbyteRecordMessage;
 import io.airbyte.protocol.models.ConfiguredAirbyteCatalog;
 import io.airbyte.protocol.models.SyncMode;
 import java.time.Instant;
@@ -44,7 +43,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 // Strategy:
 // 1. Create a temporary table for each stream
@@ -86,7 +84,7 @@ public class JdbcBufferedConsumerFactory {
     }).collect(Collectors.toList());
   }
 
-  private static VoidCallable onStartFunction(DestinationSqlOperations sqlOperations, List<WriteConfig> writeConfigs) {
+  private static OnStartFunction onStartFunction(DestinationSqlOperations sqlOperations, List<WriteConfig> writeConfigs) {
     return () -> {
       for (final WriteConfig writeConfig : writeConfigs) {
         final String schemaName = writeConfig.getOutputNamespaceName();
@@ -100,9 +98,9 @@ public class JdbcBufferedConsumerFactory {
     };
   }
 
-  private static CheckedBiConsumer<String, Stream<AirbyteRecordMessage>, Exception> recordWriterFunction(DestinationSqlOperations sqlOperations,
-                                                                                                         List<WriteConfig> writeConfigs,
-                                                                                                         ConfiguredAirbyteCatalog catalog) {
+  private static RecordWriter recordWriterFunction(DestinationSqlOperations sqlOperations,
+                                                   List<WriteConfig> writeConfigs,
+                                                   ConfiguredAirbyteCatalog catalog) {
     final Map<String, WriteConfig> streamNameToWriteConfig = writeConfigs.stream()
         .collect(Collectors.toUnmodifiableMap(WriteConfig::getStreamName, Function.identity()));
 
@@ -117,7 +115,7 @@ public class JdbcBufferedConsumerFactory {
     };
   }
 
-  private static CheckedConsumer<Boolean, Exception> onCloseFunction(DestinationSqlOperations sqlOperations, List<WriteConfig> writeConfigs) {
+  private static OnCloseFunction onCloseFunction(DestinationSqlOperations sqlOperations, List<WriteConfig> writeConfigs) {
     return (hasFailed) -> {
       // copy data
       if (!hasFailed) {

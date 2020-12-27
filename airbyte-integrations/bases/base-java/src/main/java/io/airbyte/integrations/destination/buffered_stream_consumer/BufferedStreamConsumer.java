@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-package io.airbyte.integrations.destination;
+package io.airbyte.integrations.destination.buffered_stream_consumer;
 
 import com.google.common.base.Charsets;
 import com.google.common.base.Preconditions;
@@ -188,6 +188,22 @@ public class BufferedStreamConsumer extends FailureTrackingConsumer<AirbyteMessa
         }
       }
     }
+  }
+
+  public interface OnStartFunction extends VoidCallable {}
+
+  public interface RecordWriter extends CheckedBiConsumer<String, Stream<AirbyteRecordMessage>, Exception> {
+
+    @Override
+    void accept(String streamName, Stream<AirbyteRecordMessage> recordStream) throws Exception;
+
+  }
+
+  public interface OnCloseFunction extends CheckedConsumer<Boolean, Exception> {
+
+    @Override
+    void accept(Boolean hasFailed) throws Exception;
+
   }
 
 }
