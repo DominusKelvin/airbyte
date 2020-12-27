@@ -46,15 +46,14 @@ import org.slf4j.LoggerFactory;
 public abstract class AbstractJdbcDestination implements Destination {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractJdbcDestination.class);
-  protected static final String COLUMN_NAME = "data";
 
   private final String driverClass;
   private final NamingConventionTransformer namingResolver;
-  private final Function<JdbcDatabase, DestinationSqlOperations> sqlOperationsFactory;
+  private final Function<JdbcDatabase, SqlOperations> sqlOperationsFactory;
 
   public AbstractJdbcDestination(final String driverClass,
                                  final NamingConventionTransformer namingResolver,
-                                 final Function<JdbcDatabase, DestinationSqlOperations> sqlOperationsFactory) {
+                                 final Function<JdbcDatabase, SqlOperations> sqlOperationsFactory) {
     this.driverClass = driverClass;
     this.namingResolver = namingResolver;
     this.sqlOperationsFactory = sqlOperationsFactory;
@@ -101,7 +100,7 @@ public abstract class AbstractJdbcDestination implements Destination {
 
   @Override
   public DestinationConsumer<AirbyteMessage> write(JsonNode config, ConfiguredAirbyteCatalog catalog) throws Exception {
-    final DestinationSqlOperations sqlOperations = sqlOperationsFactory.apply(getDatabase(config));
+    final SqlOperations sqlOperations = sqlOperationsFactory.apply(getDatabase(config));
     return JdbcBufferedConsumerFactory.build(sqlOperations, namingResolver, config, catalog);
   }
 

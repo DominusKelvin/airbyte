@@ -30,7 +30,7 @@ import io.airbyte.commons.json.Jsons;
 import io.airbyte.integrations.base.Destination;
 import io.airbyte.integrations.base.IntegrationRunner;
 import io.airbyte.integrations.destination.jdbc.AbstractJdbcDestination;
-import io.airbyte.integrations.destination.jdbc.DefaultDestinationSqlOperations;
+import io.airbyte.integrations.destination.jdbc.DefaultSqlOperations;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,17 +38,18 @@ import org.slf4j.LoggerFactory;
 public class PostgresDestination extends AbstractJdbcDestination implements Destination {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PostgresDestination.class);
-  protected static final String COLUMN_NAME = AbstractJdbcDestination.COLUMN_NAME;
+
+  public static final String DRIVER_CLASS = "org.postgresql.Driver";
 
   public PostgresDestination() {
-    super("org.postgresql.Driver", new PostgresSQLNameTransformer(), DefaultDestinationSqlOperations::new);
+    super("org.postgresql.Driver", new PostgresSQLNameTransformer(), DefaultSqlOperations::new);
   }
 
   @Override
   public JsonNode toJdbcConfig(JsonNode config) {
     final String schema = Optional.ofNullable(config.get("schema")).map(JsonNode::asText).orElse("public");
 
-    ImmutableMap.Builder<Object, Object> configBuilder = ImmutableMap.builder()
+    final ImmutableMap.Builder<Object, Object> configBuilder = ImmutableMap.builder()
         .put("username", config.get("username").asText())
         .put("jdbc_url", String.format("jdbc:postgresql://%s:%s/%s",
             config.get("host").asText(),

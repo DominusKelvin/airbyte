@@ -34,9 +34,7 @@ import io.airbyte.commons.functional.CheckedConsumer;
 // 3. Always (on success or failure) finalize by calling {@link DestinationConsumer#close()}
 public interface DestinationConsumer<T> extends CheckedConsumer<T, Exception>, AutoCloseable {
 
-  default void start() throws Exception {
-
-  }
+  void start() throws Exception;
 
   @Override
   void accept(T message) throws Exception;

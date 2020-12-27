@@ -155,8 +155,12 @@ public class CsvDestination implements Destination {
     }
 
     @Override
-    protected void acceptTracked(AirbyteMessage message) throws Exception {
+    protected void startTracked() {
+      // no op.
+    }
 
+    @Override
+    protected void acceptTracked(AirbyteMessage message) throws Exception {
       // ignore other message types.
       if (message.getType() == AirbyteMessage.Type.RECORD) {
         if (!writeConfigs.containsKey(message.getRecord().getStream())) {

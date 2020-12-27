@@ -108,7 +108,7 @@ public class BufferedStreamConsumer extends FailureTrackingConsumer<AirbyteMessa
   }
 
   @Override
-  public void startTracked() throws Exception {
+  protected void startTracked() throws Exception {
     // todo (cgardens) move this into failuretrackingconsumer.
     Preconditions.checkState(!hasStarted, "Consumer has already been started.");
     hasStarted = true;

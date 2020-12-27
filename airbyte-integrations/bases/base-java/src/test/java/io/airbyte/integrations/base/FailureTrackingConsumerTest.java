@@ -57,6 +57,11 @@ class FailureTrackingConsumerTest {
   static class TestConsumer extends FailureTrackingConsumer<String> {
 
     @Override
+    protected void startTracked() {
+
+    }
+
+    @Override
     protected void acceptTracked(String s) {
 
     }
