@@ -25,16 +25,24 @@
 package io.airbyte.integrations.destination.jdbc;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import io.airbyte.commons.functional.CheckedBiConsumer;
 import io.airbyte.integrations.base.DestinationConsumer;
 import io.airbyte.integrations.destination.NamingConventionTransformer;
 import io.airbyte.protocol.models.AirbyteMessage;
+import io.airbyte.protocol.models.AirbyteRecordMessage;
 import io.airbyte.protocol.models.ConfiguredAirbyteCatalog;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This factory builds pipelines of DestinationConsumer of AirbyteMessage with different strategies.
  */
-public class DestinationConsumerFactory {
+public class SqlDestinationConsumerFactory {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(SqlDestinationConsumerFactory.class);
 
   /**
    * This pipeline is based on DestinationConsumers that can interact with some kind of Sql based
@@ -60,7 +68,7 @@ public class DestinationConsumerFactory {
    * the final table name.
    * </p>
    *
-   * @param destination is a destination based on Sql engine which provides certain SQL Queries to
+   * @param sqlOperations is a destination based on Sql engine which provides certain SQL Queries to
    *        interact with
    * @param namingResolver is a SQLNamingResolvable object to translate strings into valid identifiers
    *        supported by the underlying Sql Database
@@ -69,7 +77,7 @@ public class DestinationConsumerFactory {
    * @return A DestinationConsumer able to accept the Airbyte Messages
    * @throws Exception
    */
-  public static DestinationConsumer<AirbyteMessage> build(DestinationSqlOperations destination,
+  public static DestinationConsumer<AirbyteMessage> build(DestinationSqlOperations sqlOperations,
                                                           NamingConventionTransformer namingResolver,
                                                           JsonNode config,
                                                           ConfiguredAirbyteCatalog catalog)
@@ -77,13 +85,54 @@ public class DestinationConsumerFactory {
     final Map<String, DestinationWriteContext> writeConfigs =
         new DestinationWriteContextFactory(namingResolver).build(config, catalog);
     // Step 2, 3 & 4
-    DestinationConsumerStrategy buffer = new BufferedStreamConsumer(destination, catalog);
-    // Step 5
-    TmpToFinalTable commit = new TruncateInsertIntoConsumer(destination);
-    // Step 1 then orchestrate buffering strategy and commit if success
-    DestinationConsumerStrategy result = new TmpDestinationConsumer(destination, buffer, commit);
-    result.setContext(writeConfigs);
-    return result;
+    return new BufferedStreamConsumer2(
+        blah(sqlOperations),
+        blah2(sqlOperations),
+        sqlOperations,
+        catalog,
+        writeConfigs);
+  }
+
+  private static CheckedBiConsumer<DestinationWriteContext, Stream<AirbyteRecordMessage>, Exception> blah(
+                                                                                                          DestinationSqlOperations sqlOperations) {
+    return (writeContext, recordStream) -> {
+      sqlOperations.insertBufferedRecords(recordStream, writeContext.getOutputNamespaceName(), writeContext.getTmpTableName());
+    };
+  }
+
+  private static CheckedBiConsumer<Boolean, List<DestinationWriteContext>, Exception> blah2(
+                                                                                            DestinationSqlOperations sqlOperations) {
+    return (hasFailed, writeContexts) -> {
+      // copy data
+      if (!hasFailed) {
+        final StringBuilder queries = new StringBuilder();
+        for (DestinationWriteContext writeContext : writeContexts) {
+          final String schemaName = writeContext.getOutputNamespaceName();
+          final String srcTableName = writeContext.getTmpTableName();
+          final String dstTableName = writeContext.getOutputTableName();
+
+          sqlOperations.createDestinationTable(schemaName, dstTableName);
+          switch (writeContext.getSyncMode()) {
+            case FULL_REFRESH -> queries.append(sqlOperations.truncateTableQuery(schemaName, dstTableName));
+            case INCREMENTAL -> {}
+            default -> throw new IllegalStateException("Unrecognized sync mode: " + writeContext.getSyncMode());
+          }
+          queries.append(sqlOperations.insertIntoFromSelectQuery(schemaName, srcTableName, dstTableName));
+          try {
+            sqlOperations.executeTransaction(queries.toString());
+          } catch (Exception e) {
+            LOGGER.error(String.format("Failed to write %s.%s because of ", schemaName, dstTableName), e);
+          }
+        }
+        sqlOperations.executeTransaction(queries.toString());
+      }
+      // clean up
+      for (DestinationWriteContext writeContext : writeContexts) {
+        final String schemaName = writeContext.getOutputNamespaceName();
+        final String tmpTableName = writeContext.getOutputTableName();
+        sqlOperations.dropDestinationTable(schemaName, tmpTableName);
+      }
+    };
   }
 
 }

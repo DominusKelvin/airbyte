@@ -24,7 +24,8 @@
 
 package io.airbyte.integrations.destination.jdbc;
 
-import io.airbyte.commons.lang.CloseableQueue;
+import io.airbyte.protocol.models.AirbyteRecordMessage;
+import java.util.stream.Stream;
 
 public interface DestinationSqlOperations {
 
@@ -36,7 +37,7 @@ public interface DestinationSqlOperations {
 
   void dropDestinationTable(String schemaName, String tmpTableName) throws Exception;
 
-  void insertBufferedRecords(int batchSize, CloseableQueue<byte[]> writeBuffer, String namespace, String streamName) throws Exception;
+  void insertBufferedRecords(Stream<AirbyteRecordMessage> records, String namespace, String tableName) throws Exception;
 
   String truncateTableQuery(String schemaName, String tableName);
 

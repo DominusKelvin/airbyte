@@ -32,16 +32,26 @@ import io.airbyte.protocol.models.SyncMode;
  */
 public class DestinationWriteContext {
 
+  private final String streamName;
   private final String outputNamespaceName;
+  private final String tmpTableName;
   private final String outputTableName;
   private final SyncMode syncMode;
-  private boolean transactionMode;
 
-  DestinationWriteContext(String outputNamespaceName, String outputTableName, SyncMode syncMode) {
+  DestinationWriteContext(String streamName, String outputNamespaceName, String tmpTableName, String outputTableName, SyncMode syncMode) {
+    this.streamName = streamName;
     this.outputNamespaceName = outputNamespaceName;
+    this.tmpTableName = tmpTableName;
     this.outputTableName = outputTableName;
     this.syncMode = syncMode;
-    this.transactionMode = true;
+  }
+
+  public String getStreamName() {
+    return streamName;
+  }
+
+  public String getTmpTableName() {
+    return tmpTableName;
   }
 
   public String getOutputNamespaceName() {
@@ -54,14 +64,6 @@ public class DestinationWriteContext {
 
   public SyncMode getSyncMode() {
     return syncMode;
-  }
-
-  public boolean getTransactionMode() {
-    return transactionMode;
-  }
-
-  public void setTransactionMode(boolean transactionMode) {
-    this.transactionMode = transactionMode;
   }
 
 }

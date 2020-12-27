@@ -30,6 +30,7 @@ import io.airbyte.integrations.destination.NamingConventionTransformer;
 import io.airbyte.protocol.models.ConfiguredAirbyteCatalog;
 import io.airbyte.protocol.models.ConfiguredAirbyteStream;
 import io.airbyte.protocol.models.SyncMode;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -47,17 +48,20 @@ public class DestinationWriteContextFactory {
   }
 
   public Map<String, DestinationWriteContext> build(JsonNode config, ConfiguredAirbyteCatalog catalog) {
+    final Instant now = Instant.now();
     Map<String, DestinationWriteContext> result = new HashMap<>();
     for (final ConfiguredAirbyteStream stream : catalog.getStreams()) {
       final String streamName = stream.getStream().getName();
       final String schemaName = getNamingResolver().getIdentifier(getSchemaName(config, stream));
       final String tableName = Names.concatQuotedNames(getNamingResolver().getIdentifier(streamName), "_raw");
+      final String tmpTableName = Names.concatQuotedNames(tableName, "_" + now.toEpochMilli());
       final SyncMode syncMode = stream.getSyncMode() != null ? stream.getSyncMode() : SyncMode.FULL_REFRESH;
-      result.put(streamName, new DestinationWriteContext(schemaName, tableName, syncMode));
+      result.put(streamName, new DestinationWriteContext(streamName, schemaName, tmpTableName, tableName, syncMode));
     }
     return result;
   }
 
+  // todo this is still wrong.
   protected String getSchemaName(JsonNode config, ConfiguredAirbyteStream stream) {
     // do we need to retrieve another more specific schema from this stream?
 

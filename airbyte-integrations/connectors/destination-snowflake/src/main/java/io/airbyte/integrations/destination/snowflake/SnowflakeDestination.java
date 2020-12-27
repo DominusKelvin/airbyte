@@ -25,10 +25,7 @@
 package io.airbyte.integrations.destination.snowflake;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.base.Charsets;
-import com.google.common.collect.Lists;
 import io.airbyte.commons.json.Jsons;
-import io.airbyte.commons.lang.CloseableQueue;
 import io.airbyte.commons.resources.MoreResources;
 import io.airbyte.db.jdbc.JdbcDatabase;
 import io.airbyte.integrations.base.Destination;
@@ -36,8 +33,8 @@ import io.airbyte.integrations.base.DestinationConsumer;
 import io.airbyte.integrations.base.IntegrationRunner;
 import io.airbyte.integrations.destination.NamingConventionTransformer;
 import io.airbyte.integrations.destination.jdbc.DefaultDestinationSqlOperations;
-import io.airbyte.integrations.destination.jdbc.DestinationConsumerFactory;
 import io.airbyte.integrations.destination.jdbc.DestinationSqlOperations;
+import io.airbyte.integrations.destination.jdbc.SqlDestinationConsumerFactory;
 import io.airbyte.protocol.models.AirbyteConnectionStatus;
 import io.airbyte.protocol.models.AirbyteConnectionStatus.Status;
 import io.airbyte.protocol.models.AirbyteMessage;
@@ -51,6 +48,8 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,7 +90,7 @@ public class SnowflakeDestination implements Destination {
   @Override
   public DestinationConsumer<AirbyteMessage> write(JsonNode config, ConfiguredAirbyteCatalog catalog) throws Exception {
     final DestinationSqlImpl destination = new DestinationSqlImpl(SnowflakeDatabase.getDatabase(config));
-    return DestinationConsumerFactory.build(destination, getNamingTransformer(), config, catalog);
+    return SqlDestinationConsumerFactory.build(destination, getNamingTransformer(), config, catalog);
   }
 
   public static void main(String[] args) throws Exception {
@@ -123,10 +122,9 @@ public class SnowflakeDestination implements Destination {
     }
 
     @Override
-    public void insertBufferedRecords(int batchSize, CloseableQueue<byte[]> writeBuffer, String schemaName, String tmpTableName) throws SQLException {
-      final List<AirbyteRecordMessage> records = accumulateRecordsFromBuffer(writeBuffer, batchSize);
+    public void insertBufferedRecords(Stream<AirbyteRecordMessage> recordsStream, String schemaName, String tmpTableName) throws SQLException {
+      final List<AirbyteRecordMessage> records = recordsStream.collect(Collectors.toList());
 
-      LOGGER.info("max size of batch: {}", batchSize);
       LOGGER.info("actual size of batch: {}", records.size());
 
       if (records.isEmpty()) {
@@ -166,29 +164,6 @@ public class SnowflakeDestination implements Destination {
           statement.execute();
         }
       });
-    }
-
-    // todo (cgardens) - dedupe.
-    /**
-     * Accumulate AirbyteRecordMessages from each buffer into batches of records so we can avoid
-     * wasteful inserts queries.
-     *
-     * @param writeBuffer the buffer of messages
-     * @param maxRecords up to how many records should be accumulated
-     * @return list of messages buffered together in a list
-     */
-    private List<AirbyteRecordMessage> accumulateRecordsFromBuffer(CloseableQueue<byte[]> writeBuffer, int maxRecords) {
-      final List<AirbyteRecordMessage> records = Lists.newArrayList();
-      for (int i = 0; i < maxRecords; i++) {
-        final byte[] record = writeBuffer.poll();
-        if (record == null) {
-          break;
-        }
-        final AirbyteRecordMessage message = Jsons.deserialize(new String(record, Charsets.UTF_8), AirbyteRecordMessage.class);
-        records.add(message);
-      }
-
-      return records;
     }
 
   }

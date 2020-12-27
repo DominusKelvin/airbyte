@@ -36,6 +36,8 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,10 +64,9 @@ public class DefaultDestinationSqlOperations implements DestinationSqlOperations
   }
 
   @Override
-  public void insertBufferedRecords(int batchSize, CloseableQueue<byte[]> writeBuffer, String schemaName, String tmpTableName) throws SQLException {
-    final List<AirbyteRecordMessage> records = accumulateRecordsFromBuffer(writeBuffer, batchSize);
+  public void insertBufferedRecords(Stream<AirbyteRecordMessage> recordsStream, String schemaName, String tmpTableName) throws SQLException {
+    final List<AirbyteRecordMessage> records = recordsStream.collect(Collectors.toList());
 
-    LOGGER.info("max size of batch: {}", batchSize);
     LOGGER.info("actual size of batch: {}", records.size());
 
     if (records.isEmpty()) {
@@ -73,7 +74,6 @@ public class DefaultDestinationSqlOperations implements DestinationSqlOperations
     }
 
     database.execute(connection -> {
-
       // Strategy: We want to use PreparedStatement because it handles binding values to the SQL query
       // (e.g. handling formatting timestamps). A PreparedStatement statement is created by supplying the
       // full SQL string at creation time. Then subsequently specifying which values are bound to the

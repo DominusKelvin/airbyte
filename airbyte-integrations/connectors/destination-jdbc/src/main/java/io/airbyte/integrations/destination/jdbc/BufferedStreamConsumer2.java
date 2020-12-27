@@ -26,52 +26,63 @@ package io.airbyte.integrations.destination.jdbc;
 
 import com.google.common.base.Charsets;
 import io.airbyte.commons.concurrency.GracefulShutdownHandler;
+import io.airbyte.commons.functional.CheckedBiConsumer;
 import io.airbyte.commons.json.Jsons;
 import io.airbyte.commons.lang.CloseableQueue;
+import io.airbyte.commons.lang.Queues;
+import io.airbyte.integrations.base.DestinationConsumer;
 import io.airbyte.integrations.base.FailureTrackingConsumer;
 import io.airbyte.protocol.models.AirbyteMessage;
+import io.airbyte.protocol.models.AirbyteRecordMessage;
 import io.airbyte.protocol.models.ConfiguredAirbyteCatalog;
 import io.airbyte.queue.BigQueue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class BufferedStreamConsumer extends FailureTrackingConsumer<AirbyteMessage> implements DestinationConsumerStrategy {
+public class BufferedStreamConsumer2 extends FailureTrackingConsumer<AirbyteMessage> implements DestinationConsumer<AirbyteMessage> {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(BufferedStreamConsumer.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(BufferedStreamConsumer2.class);
   private static final long THREAD_DELAY_MILLIS = 500L;
 
   private static final long GRACEFUL_SHUTDOWN_MINUTES = 5L;
   private static final int MIN_RECORDS = 500;
   private static final int BATCH_SIZE = 500;
 
+  private final CheckedBiConsumer<DestinationWriteContext, Stream<AirbyteRecordMessage>, Exception> consumer;
+  private final CheckedBiConsumer<Boolean, List<DestinationWriteContext>, Exception> onClose;
   private final DestinationSqlOperations destination;
-  private Map<String, DestinationWriteContext> writeConfigs;
-  private Map<String, CloseableQueue<byte[]>> writeBuffers;
+  private final Map<String, DestinationWriteContext> writeConfigs;
+  private final Map<String, CloseableQueue<byte[]>> writeBuffers;
   private final ScheduledExecutorService writerPool;
   private final ConfiguredAirbyteCatalog catalog;
 
-  public BufferedStreamConsumer(DestinationSqlOperations destination, ConfiguredAirbyteCatalog catalog) {
+  public BufferedStreamConsumer2(CheckedBiConsumer<DestinationWriteContext, Stream<AirbyteRecordMessage>, Exception> consumer,
+                                 CheckedBiConsumer<Boolean, List<DestinationWriteContext>, Exception> onClose,
+                                 DestinationSqlOperations destination,
+                                 ConfiguredAirbyteCatalog catalog,
+                                 Map<String, DestinationWriteContext> configs)
+      throws IOException {
+    this.consumer = consumer;
+    this.onClose = onClose;
     this.destination = destination;
-    this.writeConfigs = new HashMap<>();
-    this.writeBuffers = new HashMap<>();
     this.writerPool = Executors.newSingleThreadScheduledExecutor();
-    this.catalog = catalog;
     Runtime.getRuntime().addShutdownHook(new GracefulShutdownHandler(Duration.ofMinutes(GRACEFUL_SHUTDOWN_MINUTES), writerPool));
-  }
+    this.catalog = catalog;
 
-  @Override
-  public void setContext(Map<String, DestinationWriteContext> configs) throws IOException {
-    writeConfigs = configs;
-    writeBuffers = new HashMap<>();
+    this.writeConfigs = configs;
+    this.writeBuffers = new HashMap<>();
     final Path queueRoot = Files.createTempDirectory("queues");
     for (String streamName : configs.keySet()) {
       final BigQueue writeBuffer = new BigQueue(queueRoot.resolve(streamName), streamName);
@@ -84,17 +95,19 @@ public class BufferedStreamConsumer extends FailureTrackingConsumer<AirbyteMessa
         TimeUnit.MILLISECONDS);
   }
 
-  private static void writeStreamsWithNRecords(int minRecords,
-                                               Map<String, DestinationWriteContext> writeConfigs,
-                                               Map<String, CloseableQueue<byte[]>> writeBuffers,
-                                               DestinationSqlOperations destination) {
+  private void writeStreamsWithNRecords(int minRecords,
+                                        Map<String, DestinationWriteContext> writeConfigs,
+                                        Map<String, CloseableQueue<byte[]>> writeBuffers,
+                                        DestinationSqlOperations destination) {
     for (final Map.Entry<String, DestinationWriteContext> entry : writeConfigs.entrySet()) {
-      final String schemaName = entry.getValue().getOutputNamespaceName();
-      final String tmpTableName = entry.getValue().getOutputTableName();
       final CloseableQueue<byte[]> writeBuffer = writeBuffers.get(entry.getKey());
       while (writeBuffer.size() > minRecords) {
         try {
-          destination.insertBufferedRecords(BufferedStreamConsumer.BATCH_SIZE, writeBuffer, schemaName, tmpTableName);
+          final Stream<AirbyteRecordMessage> recordStream = Queues.toStream(writeBuffer)
+              .limit(BufferedStreamConsumer2.BATCH_SIZE)
+              .map(record -> Jsons.deserialize(new String(record, Charsets.UTF_8), AirbyteRecordMessage.class));
+          LOGGER.info("max size of batch: {}", BufferedStreamConsumer2.BATCH_SIZE);
+          consumer.accept(entry.getValue(), recordStream);
         } catch (Exception e) {
           throw new RuntimeException(e);
         }
@@ -133,6 +146,9 @@ public class BufferedStreamConsumer extends FailureTrackingConsumer<AirbyteMessa
       // write anything that is left in the buffers.
       writeStreamsWithNRecords(0, writeConfigs, writeBuffers, destination);
     }
+
+    onClose.accept(hasFailed, new ArrayList<>(writeConfigs.values()));
+
     for (CloseableQueue<byte[]> writeBuffer : writeBuffers.values()) {
       writeBuffer.close();
     }
