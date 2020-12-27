@@ -25,6 +25,7 @@
 package io.airbyte.integrations.destination.jdbc;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.base.Preconditions;
 import io.airbyte.commons.text.Names;
 import io.airbyte.integrations.destination.NamingConventionTransformer;
 import io.airbyte.protocol.models.ConfiguredAirbyteCatalog;
@@ -48,32 +49,17 @@ public class DestinationWriteContextFactory {
   }
 
   public Map<String, DestinationWriteContext> build(JsonNode config, ConfiguredAirbyteCatalog catalog) {
+    Preconditions.checkState(config.has("schema"), "jdbc destinations must specify a schema.");
     final Instant now = Instant.now();
-    Map<String, DestinationWriteContext> result = new HashMap<>();
+    final Map<String, DestinationWriteContext> result = new HashMap<>();
     for (final ConfiguredAirbyteStream stream : catalog.getStreams()) {
       final String streamName = stream.getStream().getName();
-      final String schemaName = getNamingResolver().getIdentifier(getSchemaName(config, stream));
-      final String tableName = Names.concatQuotedNames(getNamingResolver().getIdentifier(streamName), "_raw");
+      final String schemaName = namingResolver.getIdentifier(config.get("schema").asText());
+      final String tableName = Names.concatQuotedNames(namingResolver.getIdentifier(streamName), "_raw");
       final String tmpTableName = Names.concatQuotedNames(tableName, "_" + now.toEpochMilli());
       final SyncMode syncMode = stream.getSyncMode() != null ? stream.getSyncMode() : SyncMode.FULL_REFRESH;
       result.put(streamName, new DestinationWriteContext(streamName, schemaName, tmpTableName, tableName, syncMode));
     }
     return result;
   }
-
-  // todo this is still wrong.
-  protected String getSchemaName(JsonNode config, ConfiguredAirbyteStream stream) {
-    // do we need to retrieve another more specific schema from this stream?
-
-    if (config.has("schema")) {
-      return config.get("schema").asText();
-    } else {
-      return "public";
-    }
-  }
-
-  public NamingConventionTransformer getNamingResolver() {
-    return namingResolver;
-  }
-
 }

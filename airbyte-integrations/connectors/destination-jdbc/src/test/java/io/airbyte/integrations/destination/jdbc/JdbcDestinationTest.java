@@ -171,8 +171,11 @@ class JdbcDestinationTest {
     final Set<JsonNode> expectedTasksJson = Sets.newHashSet(MESSAGE_TASKS1.getRecord().getData(), MESSAGE_TASKS2.getRecord().getData());
     assertEquals(expectedTasksJson, tasksActual);
 
-    assertTmpTablesNotPresent(
-        CATALOG.getStreams().stream().map(ConfiguredAirbyteStream::getStream).map(AirbyteStream::getName).collect(Collectors.toList()));
+    assertTmpTablesNotPresent(CATALOG.getStreams()
+        .stream()
+        .map(ConfiguredAirbyteStream::getStream)
+        .map(AirbyteStream::getName)
+        .collect(Collectors.toList()));
   }
 
   @Test
@@ -210,8 +213,11 @@ class JdbcDestinationTest {
     final Set<JsonNode> expectedTasksJson = Sets.newHashSet(MESSAGE_TASKS1.getRecord().getData(), MESSAGE_TASKS2.getRecord().getData());
     assertEquals(expectedTasksJson, tasksActual);
 
-    assertTmpTablesNotPresent(
-        CATALOG.getStreams().stream().map(ConfiguredAirbyteStream::getStream).map(AirbyteStream::getName).collect(Collectors.toList()));
+    assertTmpTablesNotPresent(CATALOG.getStreams()
+        .stream()
+        .map(ConfiguredAirbyteStream::getStream)
+        .map(AirbyteStream::getName)
+        .collect(Collectors.toList()));
   }
 
   @Test
@@ -238,8 +244,11 @@ class JdbcDestinationTest {
     final Set<JsonNode> expectedTasksJson = Sets.newHashSet(MESSAGE_TASKS1.getRecord().getData(), MESSAGE_TASKS2.getRecord().getData());
     assertEquals(expectedTasksJson, tasksActual);
 
-    assertTmpTablesNotPresent(
-        CATALOG.getStreams().stream().map(ConfiguredAirbyteStream::getStream).map(AirbyteStream::getName).collect(Collectors.toList()));
+    assertTmpTablesNotPresent(CATALOG.getStreams()
+        .stream()
+        .map(ConfiguredAirbyteStream::getStream)
+        .map(AirbyteStream::getName)
+        .collect(Collectors.toList()));
 
     assertThrows(RuntimeException.class, () -> recordRetriever(destination.getNamingTransformer().getRawTableName(USERS_STREAM_NAME)));
   }
@@ -285,20 +294,23 @@ class JdbcDestinationTest {
   }
 
   private Set<JsonNode> recordRetriever(String streamName) throws Exception {
-    return database.query(ctx -> ctx
-        .fetch(String.format("SELECT * FROM %s ORDER BY emitted_at ASC;", streamName))
-        .stream()
-        .peek(record -> {
-          // ensure emitted_at is not in the future
-          OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
-          OffsetDateTime emitted_at = record.get("emitted_at", OffsetDateTime.class);
+    return database.query(ctx -> {
+      System.out.println("hi");
+      return ctx
+          .fetch(String.format("SELECT * FROM %s ORDER BY emitted_at ASC;", streamName))
+          .stream()
+          .peek(record -> {
+            // ensure emitted_at is not in the future
+            OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+            OffsetDateTime emitted_at = record.get("emitted_at", OffsetDateTime.class);
 
-          assertTrue(now.toEpochSecond() >= emitted_at.toEpochSecond());
-        })
-        .map(r -> r.formatJSON(JSON_FORMAT))
-        .map(Jsons::deserialize)
-        .map(r -> Jsons.deserialize(r.get(JdbcDestination.COLUMN_NAME).asText()))
-        .collect(Collectors.toSet()));
+            assertTrue(now.toEpochSecond() >= emitted_at.toEpochSecond());
+          })
+          .map(r -> r.formatJSON(JSON_FORMAT))
+          .map(Jsons::deserialize)
+          .map(r -> Jsons.deserialize(r.get(JdbcDestination.COLUMN_NAME).asText()))
+          .collect(Collectors.toSet());
+    });
   }
 
   private JsonNode createConfig(String schemaName) {

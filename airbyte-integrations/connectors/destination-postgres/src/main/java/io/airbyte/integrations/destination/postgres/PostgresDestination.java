@@ -30,6 +30,7 @@ import io.airbyte.commons.json.Jsons;
 import io.airbyte.integrations.base.Destination;
 import io.airbyte.integrations.base.IntegrationRunner;
 import io.airbyte.integrations.destination.jdbc.AbstractJdbcDestination;
+import io.airbyte.integrations.destination.jdbc.DefaultDestinationSqlOperations;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,7 +41,7 @@ public class PostgresDestination extends AbstractJdbcDestination implements Dest
   protected static final String COLUMN_NAME = AbstractJdbcDestination.COLUMN_NAME;
 
   public PostgresDestination() {
-    super("org.postgresql.Driver", new PostgresSQLNameTransformer());
+    super("org.postgresql.Driver", new PostgresSQLNameTransformer(), DefaultDestinationSqlOperations::new);
   }
 
   @Override

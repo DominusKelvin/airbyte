@@ -85,23 +85,35 @@ public class SqlDestinationConsumerFactory {
     final Map<String, DestinationWriteContext> writeConfigs =
         new DestinationWriteContextFactory(namingResolver).build(config, catalog);
     // Step 2, 3 & 4
-    return new BufferedStreamConsumer2(
+    for (final DestinationWriteContext writeConfig : writeConfigs.values()) {
+      init(sqlOperations, writeConfig);
+    }
+    return new BufferedStreamConsumer(
         blah(sqlOperations),
         blah2(sqlOperations),
-        sqlOperations,
         catalog,
         writeConfigs);
   }
 
-  private static CheckedBiConsumer<DestinationWriteContext, Stream<AirbyteRecordMessage>, Exception> blah(
-                                                                                                          DestinationSqlOperations sqlOperations) {
+  // todo - this shouldn't be in a "factory"
+  private static void init(DestinationSqlOperations sqlOperations, DestinationWriteContext writeContext) throws Exception {
+
+    final String schemaName = writeContext.getOutputNamespaceName();
+    final String tmpTableName = writeContext.getTmpTableName();
+
+    // if (!schemaSet.contains(schemaName)) {
+    sqlOperations.createSchema(schemaName);
+    // }
+    sqlOperations.createDestinationTable(schemaName, tmpTableName);
+  }
+
+  private static CheckedBiConsumer<DestinationWriteContext, Stream<AirbyteRecordMessage>, Exception> blah(DestinationSqlOperations sqlOperations) {
     return (writeContext, recordStream) -> {
       sqlOperations.insertBufferedRecords(recordStream, writeContext.getOutputNamespaceName(), writeContext.getTmpTableName());
     };
   }
 
-  private static CheckedBiConsumer<Boolean, List<DestinationWriteContext>, Exception> blah2(
-                                                                                            DestinationSqlOperations sqlOperations) {
+  private static CheckedBiConsumer<Boolean, List<DestinationWriteContext>, Exception> blah2(DestinationSqlOperations sqlOperations) {
     return (hasFailed, writeContexts) -> {
       // copy data
       if (!hasFailed) {
@@ -118,18 +130,13 @@ public class SqlDestinationConsumerFactory {
             default -> throw new IllegalStateException("Unrecognized sync mode: " + writeContext.getSyncMode());
           }
           queries.append(sqlOperations.insertIntoFromSelectQuery(schemaName, srcTableName, dstTableName));
-          try {
-            sqlOperations.executeTransaction(queries.toString());
-          } catch (Exception e) {
-            LOGGER.error(String.format("Failed to write %s.%s because of ", schemaName, dstTableName), e);
-          }
         }
         sqlOperations.executeTransaction(queries.toString());
       }
       // clean up
       for (DestinationWriteContext writeContext : writeContexts) {
         final String schemaName = writeContext.getOutputNamespaceName();
-        final String tmpTableName = writeContext.getOutputTableName();
+        final String tmpTableName = writeContext.getTmpTableName();
         sqlOperations.dropDestinationTable(schemaName, tmpTableName);
       }
     };

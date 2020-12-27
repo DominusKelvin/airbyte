@@ -51,9 +51,9 @@ import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class BufferedStreamConsumer2 extends FailureTrackingConsumer<AirbyteMessage> implements DestinationConsumer<AirbyteMessage> {
+public class BufferedStreamConsumer extends FailureTrackingConsumer<AirbyteMessage> implements DestinationConsumer<AirbyteMessage> {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(BufferedStreamConsumer2.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(BufferedStreamConsumer.class);
   private static final long THREAD_DELAY_MILLIS = 500L;
 
   private static final long GRACEFUL_SHUTDOWN_MINUTES = 5L;
@@ -62,21 +62,18 @@ public class BufferedStreamConsumer2 extends FailureTrackingConsumer<AirbyteMess
 
   private final CheckedBiConsumer<DestinationWriteContext, Stream<AirbyteRecordMessage>, Exception> consumer;
   private final CheckedBiConsumer<Boolean, List<DestinationWriteContext>, Exception> onClose;
-  private final DestinationSqlOperations destination;
   private final Map<String, DestinationWriteContext> writeConfigs;
   private final Map<String, CloseableQueue<byte[]>> writeBuffers;
   private final ScheduledExecutorService writerPool;
   private final ConfiguredAirbyteCatalog catalog;
 
-  public BufferedStreamConsumer2(CheckedBiConsumer<DestinationWriteContext, Stream<AirbyteRecordMessage>, Exception> consumer,
-                                 CheckedBiConsumer<Boolean, List<DestinationWriteContext>, Exception> onClose,
-                                 DestinationSqlOperations destination,
-                                 ConfiguredAirbyteCatalog catalog,
-                                 Map<String, DestinationWriteContext> configs)
+  public BufferedStreamConsumer(CheckedBiConsumer<DestinationWriteContext, Stream<AirbyteRecordMessage>, Exception> recordWriter,
+      CheckedBiConsumer<Boolean, List<DestinationWriteContext>, Exception> onClose,
+      ConfiguredAirbyteCatalog catalog,
+      Map<String, DestinationWriteContext> configs)
       throws IOException {
-    this.consumer = consumer;
+    this.consumer = recordWriter;
     this.onClose = onClose;
-    this.destination = destination;
     this.writerPool = Executors.newSingleThreadScheduledExecutor();
     Runtime.getRuntime().addShutdownHook(new GracefulShutdownHandler(Duration.ofMinutes(GRACEFUL_SHUTDOWN_MINUTES), writerPool));
     this.catalog = catalog;
@@ -89,7 +86,7 @@ public class BufferedStreamConsumer2 extends FailureTrackingConsumer<AirbyteMess
       writeBuffers.put(streamName, writeBuffer);
     }
     writerPool.scheduleWithFixedDelay(
-        () -> writeStreamsWithNRecords(MIN_RECORDS, writeConfigs, writeBuffers, destination),
+        () -> writeStreamsWithNRecords(MIN_RECORDS, writeConfigs, writeBuffers),
         THREAD_DELAY_MILLIS,
         THREAD_DELAY_MILLIS,
         TimeUnit.MILLISECONDS);
@@ -97,16 +94,15 @@ public class BufferedStreamConsumer2 extends FailureTrackingConsumer<AirbyteMess
 
   private void writeStreamsWithNRecords(int minRecords,
                                         Map<String, DestinationWriteContext> writeConfigs,
-                                        Map<String, CloseableQueue<byte[]>> writeBuffers,
-                                        DestinationSqlOperations destination) {
+                                        Map<String, CloseableQueue<byte[]>> writeBuffers) {
     for (final Map.Entry<String, DestinationWriteContext> entry : writeConfigs.entrySet()) {
       final CloseableQueue<byte[]> writeBuffer = writeBuffers.get(entry.getKey());
       while (writeBuffer.size() > minRecords) {
         try {
           final Stream<AirbyteRecordMessage> recordStream = Queues.toStream(writeBuffer)
-              .limit(BufferedStreamConsumer2.BATCH_SIZE)
+              .limit(BufferedStreamConsumer.BATCH_SIZE)
               .map(record -> Jsons.deserialize(new String(record, Charsets.UTF_8), AirbyteRecordMessage.class));
-          LOGGER.info("max size of batch: {}", BufferedStreamConsumer2.BATCH_SIZE);
+          LOGGER.info("max size of batch: {}", BufferedStreamConsumer.BATCH_SIZE);
           consumer.accept(entry.getValue(), recordStream);
         } catch (Exception e) {
           throw new RuntimeException(e);
@@ -144,7 +140,7 @@ public class BufferedStreamConsumer2 extends FailureTrackingConsumer<AirbyteMess
       writerPool.awaitTermination(GRACEFUL_SHUTDOWN_MINUTES, TimeUnit.MINUTES);
 
       // write anything that is left in the buffers.
-      writeStreamsWithNRecords(0, writeConfigs, writeBuffers, destination);
+      writeStreamsWithNRecords(0, writeConfigs, writeBuffers);
     }
 
     onClose.accept(hasFailed, new ArrayList<>(writeConfigs.values()));
