@@ -55,10 +55,10 @@ import java.util.stream.Collectors;
 // the final table name.
 public class JdbcBufferedConsumerFactory {
 
-  public static DestinationConsumer<AirbyteMessage> build(SqlOperations sqlOperations,
-                                                          NamingConventionTransformer namingResolver,
-                                                          JsonNode config,
-                                                          ConfiguredAirbyteCatalog catalog) {
+  public static DestinationConsumer<AirbyteMessage> create(SqlOperations sqlOperations,
+                                                           NamingConventionTransformer namingResolver,
+                                                           JsonNode config,
+                                                           ConfiguredAirbyteCatalog catalog) {
     final List<WriteConfig> writeConfigs = createWriteConfigs(namingResolver, config, catalog);
 
     return new BufferedStreamConsumer(
